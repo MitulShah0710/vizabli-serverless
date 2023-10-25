@@ -1,0 +1,395 @@
+service: pinkman
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs14.x
+  timeout: 10
+  region: ${param:region}
+  memorySize: ${param:memorySize}
+  apiGateway:
+    apiKeys:
+      - pinkman-${param:stageName}
+  # httpApi:
+  #   authorizers:
+  #     cognitoAuthorizer:
+  #       identitySource: $request.header.Authorization
+  #       issuerUrl: https://cognito-idp.us-east-2.amazonaws.com/us-east-2_qlZbnPw7k
+  #       audience:
+  #         - "7fp48j4v198b8um8n2vpf5t7j7"
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:UpdateItem
+            - dynamodb:PutItem
+            - dynamodb:DeleteItem
+          Resource:
+            - !GetAtt EnvironmentTable.Arn
+            - !GetAtt FeatureTable.Arn
+  environment:
+    STAGE_NAME: ${param:stageName}
+    ENVIRONMENT_TABLE: !Ref EnvironmentTable
+    FEATURE_TABLE: !Ref FeatureTable
+
+# Stage parameters
+params:
+  # Values for the "prod" stage
+  production:
+    region: "us-east-1"
+    memorySize: "128"
+    stageName: "production"
+  # Values for the "dev" stage
+  development:
+    region: "us-east-2"
+    memorySize: "128" 
+    stageName: "development"
+
+package:
+  individually: true
+  patterns:
+    - '!node_modules/**'
+    - '!*.yml'
+    - '!*'
+
+functions:
+  getEnvironmentList:
+    handler: functions/api/environment/getEnvironmentList.handler
+    package:
+      patterns:
+        - '**/getEnvironmentList.js'
+    events:
+      - http:
+          path: 'environment'
+          method: get
+          authorizer:
+            type: COGNITO_USER_POOLS
+            scopes: # Optional
+              - aws.cognito.signin.user.admin
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+
+  getEnvironment:
+    handler: functions/api/environment/getEnvironment.handler
+    package:
+      patterns:
+        - '**/getEnvironment.js'
+    events:
+      - http:
+          path: 'environment/{id}'
+          method: get
+          authorizer:
+            type: COGNITO_USER_POOLS
+            scopes: # Optional
+              - aws.cognito.signin.user.admin
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+
+  createEnvironment:
+    handler: functions/api/environment/createEnvironment.handler
+    package:
+      patterns:
+        - '**/createEnvironment.js'
+    events:
+      - http:
+          path: environment
+          method: post
+          authorizer:
+            type: COGNITO_USER_POOLS
+            scopes: # Optional
+              - aws.cognito.signin.user.admin
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+
+  updateEnvironment:
+    handler: functions/api/environment/updateEnvironment.handler
+    package:
+      patterns:
+        - '**/updateEnvironment.js'
+    events:
+      - http:
+          path: '/environment/{id}'
+          method: put
+          authorizer:
+            type: COGNITO_USER_POOLS
+            scopes: # Optional
+              - aws.cognito.signin.user.admin
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+
+  deleteEnvironment:
+    handler: functions/api/environment/deleteEnvironment.handler
+    package:
+      patterns:
+        - '**/deleteEnvironment.js'
+    events:
+      - http:
+          path: '/environment/{id}'
+          method: delete
+          authorizer:
+            type: COGNITO_USER_POOLS
+            scopes: # Optional
+              - aws.cognito.signin.user.admin
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+
+  getFeatureList:
+    handler: functions/api/feature/getFeatureList.handler
+    package:
+      patterns:
+        - '**/getFeatureList.js'
+    events:
+      - http:
+          path: 'feature'
+          method: get
+          authorizer:
+            type: COGNITO_USER_POOLS
+            scopes: # Optional
+              - aws.cognito.signin.user.admin
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+
+  getFeature:
+    handler: functions/api/feature/getFeature.handler
+    package:
+      patterns:
+        - '**/getFeature.js'
+    events:
+      - http:
+          path: 'feature/{id}'
+          method: get
+          authorizer:
+            type: COGNITO_USER_POOLS
+            scopes: # Optional
+              - aws.cognito.signin.user.admin
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+
+  createFeature:
+    handler: functions/api/feature/createFeature.handler
+    package:
+      patterns:
+        - '**/createFeature.js'
+    events:
+      - http:
+          path: feature
+          method: post
+          authorizer:
+            type: COGNITO_USER_POOLS
+            scopes: # Optional
+              - aws.cognito.signin.user.admin
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+
+  updateFeature:
+    handler: functions/api/feature/updateFeature.handler
+    package:
+      patterns:
+        - '**/updateFeature.js'
+    events:
+      - http:
+          path: '/feature/{id}'
+          method: put
+          authorizer:
+            type: COGNITO_USER_POOLS
+            scopes: # Optional
+              - aws.cognito.signin.user.admin
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+
+  deleteFeature:
+    handler: functions/api/feature/deleteFeature.handler
+    package:
+      patterns:
+        - '**/deleteFeature.js'
+    events:
+      - http:
+          path: '/feature/{id}'
+          method: delete
+          authorizer:
+            type: COGNITO_USER_POOLS
+            scopes: # Optional
+              - aws.cognito.signin.user.admin
+            authorizerId:
+              Ref: ApiGatewayAuthorizer            
+
+resources:
+  Resources:
+    EnvironmentTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+
+    FeatureTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+
+    CognitoUserPool:
+      Type: AWS::Cognito::UserPool
+      Properties:
+        AutoVerifiedAttributes:
+          - email
+        AdminCreateUserConfig:
+          AllowAdminCreateUserOnly: true
+        VerificationMessageTemplate:
+          DefaultEmailOption: CONFIRM_WITH_LINK
+        Policies:
+          PasswordPolicy:
+            MinimumLength: 8
+            RequireLowercase: true
+            RequireNumbers: true
+            RequireUppercase: true
+            RequireSymbols: false
+        UsernameConfiguration:
+          CaseSensitive: false
+        UsernameAttributes:
+          - email
+        Schema:
+          - AttributeDataType: String
+            Name: name
+            Required: false
+            Mutable: true
+          - AttributeDataType: String
+            Name: email
+            Required: false
+            Mutable: true
+
+    UserPoolDomain:
+      Type: AWS::Cognito::UserPoolDomain
+      Properties: 
+        Domain: 'pinkman-auth-${param:stageName}'
+        UserPoolId: !Ref CognitoUserPool
+
+    WebClient:
+      Type: AWS::Cognito::UserPoolClient
+      Properties:
+        UserPoolId: !Ref CognitoUserPool
+        ClientName: app-client
+        ExplicitAuthFlows:
+          - ALLOW_USER_SRP_AUTH
+          - ALLOW_USER_PASSWORD_AUTH
+          - ALLOW_REFRESH_TOKEN_AUTH
+        PreventUserExistenceErrors: LEGACY
+        SupportedIdentityProviders:
+          - COGNITO
+
+    OriginS3Bucket:
+      Type: AWS::S3::Bucket
+      Properties: 
+        AccessControl: PublicRead
+        BucketName: pinkman-web-${param:stageName}
+        CorsConfiguration: 
+          CorsRules:
+            - AllowedHeaders:
+                - '*'
+              AllowedMethods:
+                - GET
+              AllowedOrigins:
+                - '*'
+              ExposedHeaders:
+                - Date
+              Id: public-read-cors-policy-1
+              MaxAge: 3600
+        PublicAccessBlockConfiguration: 
+          BlockPublicAcls: false
+          BlockPublicPolicy: false
+          IgnorePublicAcls: false
+          RestrictPublicBuckets: false
+        WebsiteConfiguration: 
+          IndexDocument: index.html
+          ErrorDocument: index.html
+
+    OriginAccessBucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket: !Ref OriginS3Bucket
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Principal: 
+                CanonicalUser: !GetAtt CloudFrontOriginAccessIdentity.S3CanonicalUserId
+              Effect: Allow
+              Action:
+                - 's3:GetObject'
+              Resource: 
+                - !GetAtt OriginS3Bucket.Arn
+                - !Join [ "", [ !GetAtt OriginS3Bucket.Arn, "/*" ] ]
+
+    CloudFrontOriginAccessIdentity:
+      Type: "AWS::CloudFront::CloudFrontOriginAccessIdentity"
+      Properties:
+        CloudFrontOriginAccessIdentityConfig:
+          Comment: !Ref OriginS3Bucket
+
+    CloudFrontDistro:
+      Type: "AWS::CloudFront::Distribution"
+      Properties:
+        DistributionConfig:
+          CustomErrorResponses:
+            - ErrorCode: 403 # not found
+              ResponseCode: 404
+              ResponsePagePath: "/index.html"
+          DefaultCacheBehavior:
+            AllowedMethods:
+              - GET
+              - HEAD
+              - OPTIONS
+            CachedMethods:
+              - GET
+              - HEAD
+              - OPTIONS
+            Compress: true
+            DefaultTTL: 3600 # in seconds
+            ForwardedValues:
+              Cookies:
+                Forward: none
+              QueryString: false
+            MaxTTL: 86400 # in seconds
+            MinTTL: 60 # in seconds
+            TargetOriginId: s3origin
+            ViewerProtocolPolicy: "redirect-to-https"
+          DefaultRootObject: "index.html"
+          Enabled: true
+          HttpVersion: http2
+          Origins:
+            - DomainName: !GetAtt "OriginS3Bucket.DomainName"
+              Id: s3origin
+              S3OriginConfig:
+                OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}"
+          PriceClass: "PriceClass_All"
+
+    ApiGatewayAuthorizer:
+      Type: AWS::ApiGateway::Authorizer
+      Properties:
+        Name: PinkmanApiAuthorizer
+        RestApiId:
+          Ref: ApiGatewayRestApi
+        Type: COGNITO_USER_POOLS
+        ProviderARNs:
+          - Fn::GetAtt: [ CognitoUserPool, Arn ]
+        IdentitySource: method.request.header.Authorization
+
+  Outputs:
+    userPoolId:
+      Value:
+        Ref: CognitoUserPool
+    webClientId:
+      Value:
+        Ref: WebClient
